@@ -1,0 +1,23 @@
+[package]
+name = "p64-emulator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+p64-core = { path = "../p64-core" }
+p64-gui = { path = "../p64-gui" }
+
+dirs = "5.0.1"
+futures = "0.3.31"
+rfd = "0.15.1"
+wgpu = "0.20"
+egui = "0.27"
+egui_wgpu_backend = "0.29"
+pollster = "0.2"
+eframe = "0.29.1"
+serde_json = "1.0.133"
+serde = { version = "1.0.215", features = ["derive"] }
+md5 = "0.7.0"
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"
+
