@@ -1,0 +1,3 @@
+parallel-rdp-standalone
+/target
+Cargo.lock
