@@ -1,0 +1,30 @@
+[workspace]
+members = [
+    "crates/p64-emulator",
+    "crates/p64-core", 
+    "crates/p64-gui",
+    "crates/p64-proc-macros", 
+]
+
+resolver = "2"
+
+default-members = ["crates/p64-emulator"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "z"
+panic = "abort"
+strip = true
+debug = false
+
+[profile.release.package."*"]
+opt-level = "z"
+strip = true
+
+[profile.dev]
+opt-level = 3
+incremental = true
+
+[profile.dev.package."*"]
+opt-level = 3
