@@ -4,6 +4,8 @@ use crate::mempak::MEMPAK_SIZE;
 
 pub type WriteCallback = fn(address: u64, value: u32) -> bool;
 
+// Create wrapper type
+
 #[derive(Default, Clone)]
 pub struct Memory {
     pub mask: Option<usize>,
@@ -85,6 +87,49 @@ impl Memory {
         self.data.len()
     }
 
+    // pub fn read_mem(&self, address: u64, access_size: AccessSize, n64 Option<&mut N64>) -> u32 {
+    //     if self.is_mempak {
+    //         let channel = (address >> 16) as usize;
+    //         let addr = (address & 0xFFFF) as u16;
+            
+    //         if (addr as usize) < MEMPAK_SIZE {
+    //             let offset = (channel * MEMPAK_SIZE) + addr as usize;
+    //             let bytes = &self.data[offset..offset + 4];
+    //             return u32::from_be_bytes(bytes.try_into().unwrap());
+    //         }
+    //         return 0;
+    //     }
+
+    //     let masked_address = match self.mask {
+    //         Some(mask) => (address as usize & mask) as u64,
+    //         None => address,
+    //     };
+
+    //     if masked_address + 4 > self.size as u64 {
+    //         panic!("Memory access out of bounds");
+    //     }
+
+    //     // Handle cycles
+    //     if n64.is_some() {
+    //         let N64 = n64.unwrap();
+
+    //         if self.calculate_cycles_from_addr_size {
+    //             if self.is_rdram {
+    //                 add_cycles(n64, rdram_calculate_cycles(address) / (access_size as u64 / 4));
+    //             }
+    //         } else if let Some(cycles) = self.cycles {
+    //             add_cycles(n64, cycles);
+    //         }
+    //     }
+
+    //     let bytes = &self.data[masked_address as usize..masked_address as usize + 4];
+    //     if self.is_little_endian {
+    //         u32::from_ne_bytes(bytes.try_into().unwrap())
+    //     } else {
+    //         u32::from_be_bytes(bytes.try_into().unwrap())
+    //     }
+    // }
+
     pub fn read_mem_fast(&self, address: u64) -> u32 {
         if self.is_mempak {
             let channel = (address >> 16) as usize;
@@ -116,6 +161,7 @@ impl Memory {
             
             if (addr as usize) < MEMPAK_SIZE {
                 // Needs N64 to Function. We can't without a shared reference.
+                // format_mempak();
                 let offset = (channel * MEMPAK_SIZE) + addr as usize;
                 let bytes = value.to_be_bytes();
                 self.data[offset..offset + 4].copy_from_slice(&bytes);
