@@ -78,6 +78,8 @@ static uint32_t vi_registers[14];
 static uint64_t last_frame_counter;
 static uint64_t frame_counter;
 
+RDP::CommandProcessorFlags flags = 0;
+
 static const unsigned cmd_len_lut[64] = {
 	1, 1, 1, 1, 1, 1, 1, 1,		  // 0-7
 	4, 6, 12, 14, 12, 14, 20, 22, // 8-15
@@ -88,69 +90,6 @@ static const unsigned cmd_len_lut[64] = {
 	1, 1, 1, 1, 1, 1, 1, 1,		  // 48-55
 	1, 1, 1, 1, 1, 1, 1, 1		  // 56-63
 };
-
-class SDL_WSIPlatform : public Vulkan::WSIPlatform
-{
-public:
-	VkSurfaceKHR create_surface(VkInstance instance, VkPhysicalDevice gpu) override;
-	void destroy_surface(VkInstance instance, VkSurfaceKHR surface) override;
-	std::vector<const char *> get_instance_extensions() override;
-	uint32_t get_surface_width() override;
-	uint32_t get_surface_height() override;
-	bool alive(Vulkan::WSI &wsi) override;
-	void poll_input() override;
-	void poll_input_async(Granite::InputTrackerHandler *handler) override;
-	void set_window(SDL_Window *_window);
-	void do_resize();
-
-private:
-	SDL_Window *window;
-};
-
-VkSurfaceKHR SDL_WSIPlatform::create_surface(VkInstance instance, VkPhysicalDevice gpu)
-{
-	VkSurfaceKHR surface = nullptr;
-	SDL_bool result = SDL_Vulkan_CreateSurface(window, instance, &surface);
-	if (result != SDL_TRUE)
-	{
-		printf("Error creating Vulkan surface\n");
-	}
-	return surface;
-}
-
-void SDL_WSIPlatform::destroy_surface(VkInstance instance, VkSurfaceKHR surface) {}
-
-std::vector<const char *> SDL_WSIPlatform::get_instance_extensions()
-{
-
-	unsigned int extensionCount = 0;
-	SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, nullptr);
-	std::vector<const char *> extensionNames(extensionCount);
-	SDL_bool result = SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, extensionNames.data());
-	if (result != SDL_TRUE)
-	{
-		printf("Error creating SDL Vulkan surface\n");
-	}
-	return extensionNames;
-}
-
-uint32_t SDL_WSIPlatform::get_surface_width()
-{
-	int w, h;
-	SDL_GetWindowSize(window, &w, &h);
-	return w;
-}
-uint32_t SDL_WSIPlatform::get_surface_height()
-{
-	int w, h;
-	SDL_GetWindowSize(window, &w, &h);
-	return h;
-}
-bool SDL_WSIPlatform::alive(Vulkan::WSI &wsi) { return true; }
-void SDL_WSIPlatform::poll_input() { SDL_PumpEvents(); }
-void SDL_WSIPlatform::poll_input_async(Granite::InputTrackerHandler *handler) { SDL_PumpEvents(); }
-void SDL_WSIPlatform::set_window(SDL_Window *_window) { window = _window; }
-void SDL_WSIPlatform::do_resize() { resize = true; }
 
 static const uint32_t vertex_spirv[] =
 	{0x07230203, 0x00010000, 0x000d000a, 0x00000034,
@@ -259,17 +198,85 @@ static const uint32_t fragment_spirv[] =
 	 0x0000000e, 0x00000012, 0x00000002, 0x00000013,
 	 0x0003003e, 0x00000009, 0x00000014, 0x000100fd,
 	 0x00010038};
-
 enum
 {
 	MB_RDRAM_DRAM_ALIGNMENT_REQUIREMENT = 64 * 1024
 };
 
 
-extern "C" void vk_close()
+class SDL_WSIPlatform : public Vulkan::WSIPlatform
 {
+public:
+	VkSurfaceKHR create_surface(VkInstance instance, VkPhysicalDevice gpu) override;
+	void destroy_surface(VkInstance instance, VkSurfaceKHR surface) override;
+	std::vector<const char *> get_instance_extensions() override;
+	uint32_t get_surface_width() override;
+	uint32_t get_surface_height() override;
+	bool alive(Vulkan::WSI &wsi) override;
+	void poll_input() override;
+	void poll_input_async(Granite::InputTrackerHandler *handler) override;
+	void set_window(SDL_Window *_window);
+	void do_resize();
+
+private:
+	SDL_Window *window;
+};
+
+VkSurfaceKHR SDL_WSIPlatform::create_surface(VkInstance instance, VkPhysicalDevice gpu)
+{
+	VkSurfaceKHR surface = nullptr;
+	SDL_bool result = SDL_Vulkan_CreateSurface(window, instance, &surface);
+	if (result != SDL_TRUE)
+	{
+		printf("Error creating Vulkan surface\n");
+	}
+	return surface;
+}
+
+void SDL_WSIPlatform::destroy_surface(VkInstance instance, VkSurfaceKHR surface) {}
+
+std::vector<const char *> SDL_WSIPlatform::get_instance_extensions()
+{
+
+	unsigned int extensionCount = 0;
+	SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, nullptr);
+	std::vector<const char *> extensionNames(extensionCount);
+	SDL_bool result = SDL_Vulkan_GetInstanceExtensions(window, &extensionCount, extensionNames.data());
+	if (result != SDL_TRUE)
+	{
+		printf("Error creating SDL Vulkan surface\n");
+	}
+	return extensionNames;
+}
+
+uint32_t SDL_WSIPlatform::get_surface_width()
+{
+	int w, h;
+	SDL_GetWindowSize(window, &w, &h);
+	return w;
+}
+uint32_t SDL_WSIPlatform::get_surface_height()
+{
+	int w, h;
+	SDL_GetWindowSize(window, &w, &h);
+	return h;
+}
+bool SDL_WSIPlatform::alive(Vulkan::WSI &wsi) { return true; }
+void SDL_WSIPlatform::poll_input() { SDL_PumpEvents(); }
+void SDL_WSIPlatform::poll_input_async(Granite::InputTrackerHandler *handler) { SDL_PumpEvents(); }
+void SDL_WSIPlatform::set_window(SDL_Window *_window) { window = _window; }
+void SDL_WSIPlatform::do_resize() { resize = true; }
+
+extern "C" {
+	void set_upscaling_1x() { flags = 0; }
+    void set_upscaling_2x() { flags = RDP::COMMAND_PROCESSOR_FLAG_UPSCALING_2X_BIT; }
+    void set_upscaling_4x() { flags = RDP::COMMAND_PROCESSOR_FLAG_UPSCALING_4X_BIT; }
+    void set_upscaling_8x() { flags = RDP::COMMAND_PROCESSOR_FLAG_UPSCALING_8X_BIT; }
+}
+
+extern "C" void vk_close() {
 	delete processor;
-	delete wsi;
+	delete wsi; 
 }
 
 extern "C" void vk_init(void *mem_base, uint32_t rdram_size, uint8_t _fullscreen)
@@ -278,7 +285,8 @@ extern "C" void vk_init(void *mem_base, uint32_t rdram_size, uint8_t _fullscreen
 
 	fullscreen = _fullscreen != 0;
 	rdram = mem_base;
-	bool window_vsync = 0;
+	// bool window_vsync = 0;
+	bool window_vsync = 1;
 	wsi = new WSI;
 	SDL_WSIPlatform *wsi_platform = new SDL_WSIPlatform;
 	wsi_platform->set_window(window);
@@ -307,7 +315,6 @@ extern "C" void vk_init(void *mem_base, uint32_t rdram_size, uint8_t _fullscreen
 	std::cout << "WSI Init Simple time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " microseconds" << std::endl;
 
 	start = std::chrono::high_resolution_clock::now();
-	RDP::CommandProcessorFlags flags = 0;
 	processor = new RDP::CommandProcessor(wsi->get_device(), rdram, 0, rdram_size, rdram_size / 2, flags);
 	end = std::chrono::high_resolution_clock::now();
 	std::cout << "Command Processor creation time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << " microseconds" << std::endl;
@@ -332,6 +339,8 @@ extern "C" void vk_init(void *mem_base, uint32_t rdram_size, uint8_t _fullscreen
 	last_frame_counter = 0;
 	frame_counter = 0;
 }
+
+
 
 extern "C" int sdl_event_filter(void *userdata, SDL_Event *event)
 {
@@ -371,34 +380,43 @@ extern "C" void set_sdl_window(void *_window)
 	SDL_SetEventFilter(sdl_event_filter, nullptr);
 }
 
-extern "C" void calculate_viewport(float *x, float *y, float *width, float *height)
+extern "C" void calculate_viewport(float *x, float *y, float *width, float *height, int32_t display_width, int32_t display_height)
 {
-	bool window_widescreen = false;
-	int32_t display_width = (window_widescreen ? 854 : 640);
-	int32_t display_height = 480;
+    int w, h;
+    SDL_GetWindowSize(window, &w, &h);
 
-	int w, h;
-	SDL_GetWindowSize(window, &w, &h);
+    *width = w;
+    *height = h;
+    *x = 0;
+    *y = 0;
+    int32_t hw = display_height * *width;
+    int32_t wh = display_width * *height;
 
-	*width = w;
-	*height = h;
-	*x = 0;
-	*y = 0;
-	int32_t hw = display_height * *width;
-	int32_t wh = display_width * *height;
+    if (hw > wh)
+    {
+        int32_t w_max = wh / display_height;
+        *x += (*width - w_max) / 2;
+        *width = w_max;
+    }
+    else if (hw < wh)
+    {
+        int32_t h_max = hw / display_width;
+        *y += (*height - h_max) / 2;
+        *height = h_max;
+    }
+}
 
-	if (hw > wh)
-	{
-		int32_t w_max = wh / display_height;
-		*x += (*width - w_max) / 2;
-		*width = w_max;
-	}
-	else if (hw < wh)
-	{
-		int32_t h_max = hw / display_width;
-		*y += (*height - h_max) / 2;
-		*height = h_max;
-	}
+struct ViewportData {
+    float x;
+    float y; 
+    float width;
+    float height;
+};
+
+extern "C" ViewportData calculate_viewport_values(int32_t width = 1280, int32_t height = 720) {
+    ViewportData vp = {};
+    calculate_viewport(&vp.x, &vp.y, &vp.width, &vp.height, width, height);
+    return vp;
 }
 
 extern "C" void render_frame(Vulkan::Device &device)
@@ -423,8 +441,15 @@ extern "C" void render_frame(Vulkan::Device &device)
 		cmd->begin_render_pass(rp);
 
 		VkViewport vp = cmd->get_viewport();
-		calculate_viewport(&vp.x, &vp.y, &vp.width, &vp.height);
-
+		ViewportData viewport_data = calculate_viewport_values();
+		
+		// Apply calculated values to VkViewport
+		vp.x = viewport_data.x;
+		vp.y = viewport_data.y;
+		vp.width = viewport_data.width;
+		vp.height = viewport_data.height;
+		
+		cmd->set_viewport(vp);
 		cmd->set_program(program);
 
 		cmd->set_opaque_state();
@@ -598,10 +623,6 @@ extern "C" uint64_t rdp_process_commands(uint32_t *dpc_regs, uint8_t *SP_DMEM)
 	return interrupt_timer;
 }
 
-extern "C" void full_sync()
-{
-	if (rdp_sync_signal)
-	{
-		processor->wait_for_timeline(rdp_sync_signal);
-	}
+extern "C" void full_sync() {
+	if (rdp_sync_signal) { processor->wait_for_timeline(rdp_sync_signal); }
 }
