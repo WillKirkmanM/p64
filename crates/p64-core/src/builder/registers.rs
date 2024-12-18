@@ -150,5 +150,30 @@ where
         }
     }
 
+    // pub fn write(&mut self, n64: &mut N64,address: u64, value: T, mask: T) {
+    //     // Calculate register index from address
+    //     let reg = ((address & 0xFFFF) >> 2) as usize;
+        
+    //     // Check bounds
+    //     if reg >= self.size {
+    //         return;
+    //     }
+
+    //     // Get old value and calculate new value with masks
+    //     let old_value = self.regs[reg];
+    //     let new_value = if let Some(write_mask) = self.write_mask {
+    //         (old_value & !mask) | (value & mask & write_mask)
+    //     } else {
+    //         (old_value & !mask) | (value & mask)
+    //     };
+
+    //     // Update register
+    //     self.regs[reg] = new_value;
+
+    //     // Call callback if present
+    //     if let Some(callback) = self.write_callback {
+    //         callback(n64, address, new_value.into(), mask.into());
+    //     }
+    // }
 }
 

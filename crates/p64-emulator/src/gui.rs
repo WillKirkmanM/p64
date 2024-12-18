@@ -9,6 +9,7 @@ use eframe::egui::{self, menu, Button, ComboBox, Grid, RichText, ScrollArea, Win
 use p64_core::{run_game, N64};
 use p64_gui::input::configure_profile;
 use p64_gui::ui::Ui;
+use p64_gui::video::{enable_1x_upscaling, enable_2x_upscaling, enable_4x_upscaling, enable_8x_upscaling, set_viewport};
 use std::{collections::HashMap, fs, path::PathBuf};
 use std::{
     fs::{read_dir, remove_file, File},
@@ -28,6 +29,33 @@ pub struct P64Gui {
     rom_folder: Option<PathBuf>,
     rom_info_cache: HashMap<PathBuf, RomInfo>,
     settings_open: bool,
+    settings: Settings
+}
+
+#[derive(Default)]
+pub struct Settings {
+    pub graphics: GraphicsSettings,
+}
+
+#[derive(Debug)]
+pub struct GraphicsSettings {
+    pub width: u32,
+    pub height: u32,
+    pub fullscreen: bool,
+    pub vsync: bool,
+    pub upscaling: u8,
+}
+
+impl Default for GraphicsSettings {
+    fn default() -> Self {
+        Self {
+            width: 1280,
+            height: 720,
+            fullscreen: false,
+            vsync: true,
+            upscaling: 1,
+        }
+    }
 }
 
 fn execute<F: std::future::Future<Output = ()> + Send + 'static>(f: F) {
@@ -91,6 +119,8 @@ impl P64Gui {
             }
         });
 
+        let settings = Settings::default();
+
         P64Gui {
             configure_profile: false,
             profile_name: String::new(),
@@ -102,6 +132,7 @@ impl P64Gui {
             roms,
             settings_open: false,
             rom_info_cache,
+            settings
         }
     }
 
@@ -258,14 +289,87 @@ impl P64Gui {
         if !self.settings_open {
             return;
         }
+    
+        let mut close = false;
+        
+        Window::new("Settings").show(ctx, |ui| {
+            ui.collapsing("Controller Settings", |ui| {
+                ui.label("Controller Config:");
+                self.show_controller_grid(ui);
+            });
 
-        Window::new("Controller Settings").show(ctx, |ui| {
-            ui.label("Controller Config:");
-            self.show_controller_grid(ui);
+            
+            ui.collapsing("Graphics Settings", |ui| {
+                let settings = &mut self.settings;
+                let resolutions: [(u32, u32); 5] = [
+                    (640, 480),
+                    (800, 600),
+                    (1024, 768),
+                    (1280, 720),
+                    (1920, 1080)
+                ];
+                
+                ui.horizontal(|ui| {
+                    ui.label("Resolution:");
+                    egui::ComboBox::from_label("")
+                        .selected_text(format!("{}x{}", settings.graphics.width, settings.graphics.height))
+                        .show_ui(ui, |ui| {
+                            for (width, height) in resolutions.iter() {
+                                let selected = settings.graphics.width == *width && settings.graphics.height == *height;
+                                if ui.selectable_label(selected, format!("{}x{}", width, height)).clicked() {
+                                    set_viewport(*width as i32, *height as i32);
+                                    settings.graphics.width = *width;
+                                    settings.graphics.height = *height;
+                                }
+                            }
+                        });
+                });
+    
+                ui.checkbox(&mut settings.graphics.fullscreen, "Fullscreen");
+
+                ui.checkbox(&mut settings.graphics.vsync, "VSync");
+    
+                ui.horizontal(|ui| {
+                ui.label("Upscaling:");
+                ui.add_space(8.0);
+                
+                let scales = [1, 2, 4, 8];
+                
+                for (i, &scale) in scales.iter().enumerate() {
+                    if i > 0 {
+                        ui.add_space(4.0);
+                    }
+                    
+                    let button_text = format!("{}×", scale);
+                    
+                    if ui.selectable_value(
+                        &mut settings.graphics.upscaling,
+                        scale,
+                        button_text
+                    ).clicked() {
+                        match scale {
+                            1 => enable_1x_upscaling(),
+                            2 => enable_2x_upscaling(),
+                            4 => enable_4x_upscaling(),
+                            8 => enable_8x_upscaling(),
+                            _ => {}
+                        }
+                    }
+                }
+            });
+            });
+    
             if ui.button("Close").clicked() {
+                close = true;
                 self.settings_open = false;
             }
         });
+    
+        // if close {
+        //     Some(settings)
+        // } else {
+        //     None
+        // }
     }
 
     fn show_rom_folder_selector(&mut self, ui: &mut egui::Ui) {
@@ -371,6 +475,9 @@ impl P64Gui {
         let task = rfd::AsyncFileDialog::new().pick_file();
         let selected_controller = self.selected_controller;
         let selected_profile = self.selected_profile.clone();
+        let fullscreen = self.settings.graphics.fullscreen;
+        let width = self.settings.graphics.width;
+        let height = self.settings.graphics.height;
 
         execute(async move {
             if let Some(file) = task.await {
@@ -383,7 +490,7 @@ impl P64Gui {
                 let _ = File::create(running_file.clone());
                 let mut device = N64::new();
                 save_config(&mut device.ui, selected_controller, selected_profile);
-                run_game(std::path::Path::new(file.path()), &mut device, false);
+                run_game(std::path::Path::new(file.path()), &mut device, width, height, fullscreen);
 
                 let _ = remove_file(running_file);
             }
@@ -484,6 +591,9 @@ impl P64Gui {
                     let selected_controller = self.selected_controller;
                     let selected_profile = self.selected_profile.clone();
                     let rom_path = rom_path.clone();
+                    let fullscreen = self.settings.graphics.fullscreen;
+                    let width = self.settings.graphics.width;
+                    let height = self.settings.graphics.height;
 
                     execute(async move {
                         let running_file =
@@ -497,7 +607,7 @@ impl P64Gui {
                         let mut device = N64::new();
                         save_config(&mut device.ui, selected_controller, selected_profile);
 
-                        run_game(&rom_path, &mut device, false);
+                        run_game(&rom_path, &mut device, width, height, fullscreen);
                         let _ = remove_file(running_file);
                     });
                 }

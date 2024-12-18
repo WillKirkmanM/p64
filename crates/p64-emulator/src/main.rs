@@ -1,6 +1,7 @@
 use dirs::ensure_directories;
 use eframe::{egui::ViewportBuilder, run_native, NativeOptions};
 use gui::P64Gui;
+use p64_gui::video::enable_4x_upscaling;
 
 pub mod rom;
 pub mod audio;
@@ -13,6 +14,7 @@ pub fn main() {
     tracing_subscriber::fmt::init();
 
     ensure_directories();
+    enable_4x_upscaling();
 
     run_native(
         "p64",

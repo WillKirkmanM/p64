@@ -1,5 +1,6 @@
 use crate::serial;
 
+// use crate::{n64, serial};
 use super::{cartridge, mmu::{add_cycles, MmuRegister}, events::{create_event, EventType}, memory::{self, masked_write_32}, mempak, peripheral::{self, PakHandler}, serial::{DmaDir, SerialRegister, SerialStatus}, N64};
 
 pub const NTSC_PIF_ROM: [u8; 1984] = [
