@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://avatars.githubusercontent.com/u/191527011?s=200&v=4" width=200 />
+  <img src="https://github.com/user-attachments/assets/4d8ae246-fa67-4b39-a2e4-072c7f09c577" width=200 />
 </p>
 <h1 align="center">p64</h1>
 
@@ -14,6 +14,10 @@
 <p align="center">An Educational and Cycle Accurate Emulator for the Nintendo 64 with full VR4300 CPU emulation, Low Level RDP, RSP & RCP Emulation</p>
 
 Capable of playing all released titles with minimal hardware requirements.
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/569dd662-2068-4767-a5d4-416603a3c2d6" />
+</p>
+
 
 # Get Started
 **Clone the Repository**
