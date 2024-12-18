@@ -8,6 +8,7 @@ p64-core = { path = "../p64-core" }
 p64-gui = { path = "../p64-gui" }
 
 dirs = "5.0.1"
+# eframe = { version = "0.29.1", features = ["wgpu"] }
 futures = "0.3.31"
 rfd = "0.15.1"
 wgpu = "0.20"
