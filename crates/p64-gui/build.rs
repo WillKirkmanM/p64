@@ -1,13 +1,11 @@
 use std::env;
 use std::process::Command;
-
 use winres::WindowsResource;
 
 const PARALLEL_RDP_PATH: &str = "parallel-rdp";
 const STANDALONE_PATH: &str = "parallel-rdp/parallel-rdp-standalone";
 
 fn add_source_files(build: &mut cc::Build) {
-    // RDP core files
     let rdp_files = [
         "command_ring.cpp", "rdp_device.cpp", "rdp_dump_write.cpp",
         "rdp_renderer.cpp", "video_interface.cpp"
@@ -16,7 +14,6 @@ fn add_source_files(build: &mut cc::Build) {
         build.file(format!("{}/parallel-rdp/{}", STANDALONE_PATH, file));
     }
 
-    // Vulkan implementation files
     let vulkan_files = [
         "buffer.cpp", "buffer_pool.cpp", "command_buffer.cpp", "command_pool.cpp",
         "context.cpp", "cookie.cpp", "descriptor_set.cpp", "device.cpp",
@@ -29,7 +26,6 @@ fn add_source_files(build: &mut cc::Build) {
         build.file(format!("{}/vulkan/{}", STANDALONE_PATH, file));
     }
 
-    // Utility files
     let util_files = [
         "arena_allocator.cpp", "logging.cpp", "thread_id.cpp", "aligned_alloc.cpp",
         "timer.cpp", "timeline_trace_file.cpp", "environment.cpp", "thread_name.cpp"
@@ -38,7 +34,6 @@ fn add_source_files(build: &mut cc::Build) {
         build.file(format!("{}/util/{}", STANDALONE_PATH, file));
     }
 
-    // Additional files
     build
         .file(format!("{}/vulkan/texture/texture_format.cpp", STANDALONE_PATH))
         .file(format!("{}/volk/volk.c", STANDALONE_PATH))
@@ -55,19 +50,49 @@ fn set_includes(build: &mut cc::Build) {
     }
 }
 
-#[cfg(all(target_os = "linux", not(target_arch = "wasm32")))]
-fn configure_linux_sdl2(build: &mut cc::Build) {
-    if let Ok(output) = Command::new("pkg-config").args(["--cflags", "sdl2"]).output() {
-        let include_path = String::from_utf8_lossy(&output.stdout);
-        for path in include_path.split_whitespace() {
-            if path.starts_with("-I") {
-                build.flag(path);
-            }
+fn configure_sdl2(build: &mut cc::Build) {
+    if let Ok(sdl2_dir) = env::var("SDL2_DIR") {
+        println!("cargo:warning=SDL2_DIR: {}", sdl2_dir);
+        
+        let mingw_include = format!("{}/x86_64-w64-mingw32/include/SDL2", sdl2_dir);
+        let mingw_lib = format!("{}/x86_64-w64-mingw32/lib", sdl2_dir);
+        let msvc_include = format!("{}/include", sdl2_dir);
+        let msvc_lib = format!("{}/lib/x64", sdl2_dir);
+        
+        if std::path::Path::new(&mingw_include).exists() {
+            println!("cargo:warning=Using MinGW SDL2 include: {}", mingw_include);
+            build.include(&mingw_include);
+            println!("cargo:rustc-link-search=native={}", mingw_lib);
+        } else if std::path::Path::new(&msvc_include).exists() {
+            println!("cargo:warning=Using MSVC SDL2 include: {}", msvc_include);
+            build.include(&msvc_include);
+            println!("cargo:rustc-link-search=native={}", msvc_lib);
+        } else {
+            panic!("Could not find SDL2 include directory");
         }
+        
+        println!("cargo:rustc-link-lib=SDL2");
+        println!("cargo:rustc-link-lib=SDL2main");
+    } else {
+        panic!("SDL2_DIR environment variable not set");
     }
-    if let Ok(include_path) = env::var("DEP_SDL2_INCLUDE") {
-        build.include(include_path);
-    }
+}
+
+fn configure_msvc(build: &mut cc::Build) {
+    build
+        .flag("/EHsc")           // Enable C++ exception handling
+        .flag("/bigobj")         // Increase object file section limit
+        .flag("/permissive-")    // Enforce strict standard compliance
+        .flag("/Zc:preprocessor") // Enable standards-conforming preprocessor
+        .flag("/wd4244")         // Disable conversion warnings
+        .flag("/wd4267")         // Disable size_t conversion warnings
+        .flag("/wd4389")         // Disable signed/unsigned mismatch warnings
+        .flag("/W4")             // Warning level 4
+        .flag("/O2")             // Optimization level
+        .define("WIN32", None)
+        .define("_WINDOWS", None)
+        .define("NOMINMAX", None)
+        .define("_CRT_SECURE_NO_WARNINGS", None);
 }
 
 fn configure_platform_specific(build: &mut cc::Build) {
@@ -83,7 +108,7 @@ fn configure_platform_specific(build: &mut cc::Build) {
         if cfg!(target_arch = "x86_64") {
             build.flag("/arch:AVX2");
         }
-        build.flag("-DVK_USE_PLATFORM_WIN32_KHR");
+        build.define("VK_USE_PLATFORM_WIN32_KHR", None);
     }
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -98,23 +123,33 @@ fn configure_platform_specific(build: &mut cc::Build) {
 }
 
 fn main() {
+    println!("cargo:rerun-if-changed=parallel-rdp/bridge.cpp");
+    println!("cargo:rerun-if-changed=build.rs");
+
     let mut build = cc::Build::new();
     
-    build.cpp(true).std("c++17");
+    build.cpp(true)
+         .std("c++17")
+         .warnings(true)
+         .debug(true);
 
-    let mut res = WindowsResource::new();
-    if cfg!(target_os = "windows") {
-        res.set_icon("../p64-gui/N64.ico");
+    #[cfg(target_os = "windows")] 
+    {
+        let mut res = WindowsResource::new();
         res.set_icon("N64.ico");
         res.compile().unwrap();
+        
+        configure_sdl2(&mut build);
+        configure_msvc(&mut build);
+        
+        if let Ok(vulkan_sdk) = env::var("VULKAN_SDK") {
+            println!("cargo:warning=Found Vulkan SDK: {}", vulkan_sdk);
+            build.include(format!("{}/Include", vulkan_sdk));
+        }
     }
     
     add_source_files(&mut build);
     set_includes(&mut build);
-    
-    #[cfg(all(target_os = "linux", not(target_arch = "wasm32")))]
-    configure_linux_sdl2(&mut build);
-    
     configure_platform_specific(&mut build);
     
     build.compile("parallel-rdp");
