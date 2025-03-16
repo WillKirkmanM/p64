@@ -285,14 +285,15 @@ fn handle_fcr31(n64: &mut N64,data: u32) {
 
 fn update_flush_mode(n64: &mut N64) {
     unsafe {
+        let _flush_mode = 0;
         let flush_mode = if n64.cpu.fpu.fcr31 & 2 != 0 {
             if n64.cpu.fpu.fcr31 & FCR31_FS_BIT != 0 {
-                std::arch::x86_64::_MM_FLUSH_ZERO_OFF
+                0
             } else {
-                std::arch::x86_64::_MM_FLUSH_ZERO_ON
+                0
             }
         } else {
-            std::arch::x86_64::_MM_FLUSH_ZERO_ON
+            0
         };
 
         if flush_mode != n64.cpu.fpu.flush_mode {
