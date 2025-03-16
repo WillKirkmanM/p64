@@ -11,8 +11,8 @@
 
 #include <chrono>
 #include <iostream>
-#include <SDL.h>
-#include <SDL_vulkan.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_vulkan.h>
 
 #include "wsi.hpp"
 #include "rdp_device.hpp"
