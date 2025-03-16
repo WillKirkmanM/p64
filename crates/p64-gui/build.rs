@@ -1,5 +1,6 @@
 use std::env;
 use std::process::Command;
+#[cfg(target_os = "windows")]
 use winres::WindowsResource;
 
 const PARALLEL_RDP_PATH: &str = "parallel-rdp";
@@ -78,6 +79,54 @@ fn configure_sdl2(build: &mut cc::Build) {
     }
 }
 
+fn configure_linux_sdl2(build: &mut cc::Build) {
+    match Command::new("pkg-config").args(["--cflags", "sdl2"]).output() {
+        Ok(output) if output.status.success() => {
+            let cflags = String::from_utf8_lossy(&output.stdout);
+            for flag in cflags.split_whitespace() {
+                if flag.starts_with("-I") {
+                    build.flag(flag);
+                }
+            }
+            
+            if let Ok(output) = Command::new("pkg-config")
+                .args(["--libs", "sdl2"])
+                .output() 
+            {
+                let libs = String::from_utf8_lossy(&output.stdout);
+                for flag in libs.split_whitespace() {
+                    if flag.starts_with("-L") {
+                        println!("cargo:rustc-link-search=native={}", &flag[2..]);
+                    } else if flag.starts_with("-l") {
+                        println!("cargo:rustc-link-lib={}", &flag[2..]);
+                    }
+                }
+            }
+            return;
+        }
+        _ => {}
+    }
+    
+    let common_include_paths = [
+        "/usr/include/SDL2",
+        "/usr/local/include/SDL2",
+    ];
+    
+    for path in &common_include_paths {
+        if std::path::Path::new(path).exists() {
+            println!("cargo:warning=Using SDL2 include path: {}", path);
+            build.include(path);
+            println!("cargo:rustc-link-lib=SDL2");
+            return;
+        }
+    }
+    
+    println!("cargo:warning=Could not find SDL2 include paths automatically");
+    
+    build.include("/usr/include/SDL2");
+    println!("cargo:rustc-link-lib=SDL2");
+}
+
 fn configure_msvc(build: &mut cc::Build) {
     build
         .flag("/EHsc")           // Enable C++ exception handling
@@ -119,6 +168,17 @@ fn configure_platform_specific(build: &mut cc::Build) {
         build
             .flag("-Wno-missing-field-initializers")
             .flag("-Wno-unused-parameter");
+            
+        #[cfg(target_os = "linux")]
+        {
+            build.define("VK_USE_PLATFORM_XCB_KHR", None);
+            build.define("VK_USE_PLATFORM_XLIB_KHR", None);
+        }
+        
+        #[cfg(target_os = "macos")]
+        {
+            build.define("VK_USE_PLATFORM_METAL_EXT", None);
+        }
     }
 }
 
@@ -145,6 +205,16 @@ fn main() {
         if let Ok(vulkan_sdk) = env::var("VULKAN_SDK") {
             println!("cargo:warning=Found Vulkan SDK: {}", vulkan_sdk);
             build.include(format!("{}/Include", vulkan_sdk));
+        }
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        configure_linux_sdl2(&mut build);
+        
+        if let Ok(vulkan_sdk) = env::var("VULKAN_SDK") {
+            println!("cargo:warning=Found Vulkan SDK: {}", vulkan_sdk);
+            build.include(format!("{}/include", vulkan_sdk));
         }
     }
     
